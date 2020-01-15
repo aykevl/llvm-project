@@ -1203,8 +1203,8 @@ let isCodeGenOnly = 1, mayLoad = 1 in
 }
 
 def MULL: ArithLogic_RRR<0x08, 0x02, "mull", mul, 1>, Requires<[HasMul32]>;
-def MULUH: ArithLogic_RRR<0x0A, 0x02, "mulsh", mulhu, 1>, Requires<[HasMul32High]>;
-def MULSH: ArithLogic_RRR<0x0B, 0x02, "mulus", mulhs, 1>, Requires<[HasMul32High]>;
+def MULUH: ArithLogic_RRR<0x0A, 0x02, "muluh", mulhu, 1>, Requires<[HasMul32High]>;
+def MULSH: ArithLogic_RRR<0x0B, 0x02, "mulsh", mulhs, 1>, Requires<[HasMul32High]>;
 def QUOS: ArithLogic_RRR<0x0D, 0x02, "quos", sdiv>, Requires<[HasDiv32]>;
 def QUOU: ArithLogic_RRR<0x0C, 0x02, "quou", udiv>, Requires<[HasDiv32]>;
 def REMS: ArithLogic_RRR<0x0F, 0x02, "rems", srem>, Requires<[HasDiv32]>;

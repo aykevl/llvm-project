@@ -23,8 +23,7 @@
 using namespace llvm;
 
 XtensaFrameLowering::XtensaFrameLowering()
-    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, Align(4), 0,
-                          Align(4)) {}
+    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 4, 0, 4) {}
 
 /*   Xtensa stack frames look like:
 
