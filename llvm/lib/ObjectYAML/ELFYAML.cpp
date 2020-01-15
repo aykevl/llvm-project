@@ -428,6 +428,11 @@ void ScalarBitSetTraits<ELFYAML::ELF_EF>::bitset(IO &IO,
     break;
   case ELF::EM_X86_64:
     break;
+  case ELF::EM_XTENSA:
+    BCase(EF_XTENSA_XT_INSN);
+    BCaseMask(E_XTENSA_MACH, EF_XTENSA_MACH);
+    BCase(EF_XTENSA_XT_LIT);
+    break;
   default:
     llvm_unreachable("Unsupported architecture");
   }
@@ -653,6 +658,9 @@ void ScalarEnumerationTraits<ELFYAML::ELF_REL>::enumeration(
     break;
   case ELF::EM_BPF:
 #include "llvm/BinaryFormat/ELFRelocs/BPF.def"
+    break;
+  case ELF::EM_XTENSA:
+#include "llvm/BinaryFormat/ELFRelocs/Xtensa.def"
     break;
   case ELF::EM_PPC64:
 #include "llvm/BinaryFormat/ELFRelocs/PowerPC64.def"
