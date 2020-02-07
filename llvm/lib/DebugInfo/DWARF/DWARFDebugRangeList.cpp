@@ -30,7 +30,7 @@ Error DWARFDebugRangeList::extract(const DWARFDataExtractor &data,
                        "invalid range list offset 0x%" PRIx64, *offset_ptr);
 
   AddressSize = data.getAddressSize();
-  if (AddressSize != 4 && AddressSize != 8)
+  if (AddressSize != 2 && AddressSize != 4 && AddressSize != 8)
     return createStringError(errc::invalid_argument,
                        "invalid address size: %" PRIu8, AddressSize);
   Offset = *offset_ptr;
