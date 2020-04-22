@@ -15,8 +15,8 @@
 
 // Returns: a / b, *rem = a % b
 
-COMPILER_RT_ABI si_int __divmodsi4(si_int a, si_int b, si_int *rem) {
+COMPILER_RT_ABI du_int __divmodsi4(si_int a, si_int b) {
   si_int d = __divsi3(a, b);
-  *rem = a - (d * b);
-  return d;
+  si_int rem = a - (d * b);
+  return (du_int)(su_int)d | ((du_int)(su_int)rem << 32);
 }

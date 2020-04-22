@@ -44,6 +44,11 @@ foreach(arch ${BUILTIN_TEST_ARCH})
     string(REPLACE ";" " " BUILTINS_TEST_TARGET_CFLAGS "${BUILTINS_TEST_TARGET_CFLAGS}")
   endif()
 
+  if (${arch} STREQUAL "avr")
+    list(APPEND BUILTINS_TEST_TARGET_CFLAGS --target=avr-atmel-none -nostdlibinc)
+    string(REPLACE ";" " " BUILTINS_TEST_TARGET_CFLAGS "${BUILTINS_TEST_TARGET_CFLAGS}")
+  endif()
+
   # Compute builtins available in library and add them as lit features.
   if(APPLE)
     # TODO: Support other Apple platforms.

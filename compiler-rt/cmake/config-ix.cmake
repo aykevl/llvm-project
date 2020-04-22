@@ -256,6 +256,7 @@ endfunction()
 
 set(ARM64 aarch64)
 set(ARM32 arm armhf)
+set(AVR avr)
 set(HEXAGON hexagon)
 set(X86 i386)
 set(X86_64 x86_64)

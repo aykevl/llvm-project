@@ -17,14 +17,15 @@
 
 // Returns: a / b
 
-extern COMPILER_RT_ABI si_int __divmodsi4(si_int a, si_int b, si_int* rem);
+extern COMPILER_RT_ABI du_int __divmodsi4(si_int a, si_int b);
 
 
 int test__divmodsi4(si_int a, si_int b, 
 						si_int expected_result, si_int expected_rem)
 {
-	si_int rem;
-    si_int result = __divmodsi4(a, b, &rem);
+    du_int pair = __divmodsi4(a, b);
+    si_int result = (su_int)pair;
+    si_int rem = (su_int)(pair >> 32);
     if (result != expected_result) {
         printf("error in __divmodsi4: %d / %d = %d, expected %d\n",
                a, b, result, expected_result);

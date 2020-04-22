@@ -17,13 +17,14 @@
 
 // Returns: a / b
 
-extern COMPILER_RT_ABI su_int __udivmodsi4(su_int a, su_int b, su_int* rem);
+extern COMPILER_RT_ABI du_int __udivmodsi4(su_int a, su_int b);
 
 int test__udivmodsi4(su_int a, su_int b, 
 						su_int expected_result, su_int expected_rem)
 {
-	su_int rem;
-    su_int result = __udivmodsi4(a, b, &rem);
+    du_int pair = __udivmodsi4(a, b);
+    su_int result = (su_int)pair;
+    su_int rem = (su_int)(pair >> 32);
     if (result != expected_result) {
         printf("error in __udivmodsi4: %u / %u = %u, expected %u\n",
                a, b, result, expected_result);
