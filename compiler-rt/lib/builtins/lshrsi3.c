@@ -1,4 +1,4 @@
-//===-- lshrdi3.c - Implement __lshrdi3 -----------------------------------===//
+//===-- lshrsi3.c - Implement __lshrsi3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,24 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements __lshrdi3 for the compiler_rt library.
+// This file implements __lshrsi3 for the compiler_rt library.
 //
 //===----------------------------------------------------------------------===//
 
 #include "int_lib.h"
 
-typedef di_int lshr_int_t;
-typedef udwords lshr_uwords_t;
+typedef si_int lshr_int_t;
+typedef uswords lshr_uwords_t;
 #include "int_lshr_impl.inc"
 
 // Returns: logical a >> b
 
-// Precondition:  0 <= b < bits_in_dword
+// Precondition:  0 <= b < bits_in_sword
 
-COMPILER_RT_ABI di_int __lshrdi3(di_int a, int b) {
+COMPILER_RT_ABI si_int __lshrsi3(si_int a, int b) {
   return __lshrXi3(a, b);
 }
-
-#if defined(__ARM_EABI__)
-COMPILER_RT_ALIAS(__lshrdi3, __aeabi_llsr)
-#endif

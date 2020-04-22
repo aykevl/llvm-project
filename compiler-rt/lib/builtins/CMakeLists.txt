@@ -52,8 +52,10 @@ set(GENERIC_SOURCES
   addvti3.c
   apple_versioning.c
   ashldi3.c
+  ashlsi3.c
   ashlti3.c
   ashrdi3.c
+  ashrsi3.c
   ashrti3.c
   bswapdi2.c
   bswapsi2.c
@@ -110,6 +112,7 @@ set(GENERIC_SOURCES
   fp_mode.c
   int_util.c
   lshrdi3.c
+  lshrsi3.c
   lshrti3.c
   moddi3.c
   modsi3.c
