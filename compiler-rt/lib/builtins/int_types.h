@@ -18,6 +18,9 @@
 
 #include "int_endianness.h"
 
+typedef int16_t hi_int;
+typedef uint16_t hu_int;
+
 // si_int is defined in Linux sysroot's asm-generic/siginfo.h
 #ifdef si_int
 #undef si_int
@@ -36,6 +39,32 @@ typedef uint32_t su_int;
 
 typedef int64_t di_int;
 typedef uint64_t du_int;
+
+typedef union {
+  si_int all;
+  struct {
+#if _YUGA_LITTLE_ENDIAN
+    hu_int low;
+    hi_int high;
+#else
+    hi_int high;
+    hu_int low;
+#endif // _YUGA_LITTLE_ENDIAN
+  } s;
+} swords;
+
+typedef union {
+  su_int all;
+  struct {
+#if _YUGA_LITTLE_ENDIAN
+    hu_int low;
+    hu_int high;
+#else
+    hu_int high;
+    hu_int low;
+#endif // _YUGA_LITTLE_ENDIAN
+  } s;
+} uswords;
 
 typedef union {
   di_int all;

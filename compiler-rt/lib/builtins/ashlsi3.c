@@ -1,4 +1,4 @@
-//===-- ashlti3.c - Implement __ashlti3 -----------------------------------===//
+// ====-- ashlsi3.c - Implement __ashlsi3 ---------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,24 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements __ashlti3 for the compiler_rt library.
+// This file implements __ashlsi3 for the compiler_rt library.
 //
 //===----------------------------------------------------------------------===//
 
 #include "int_lib.h"
 
-#ifdef CRT_HAS_128BIT
-
-typedef ti_int ashl_int_t;
-typedef twords ashl_words_t;
+typedef si_int ashl_int_t;
+typedef swords ashl_words_t;
 #include "int_ashl_impl.inc"
 
 // Returns: a << b
 
-// Precondition:  0 <= b < bits_in_tword
+// Preconsition:  0 <= b < bits_in_sword
 
-COMPILER_RT_ABI ti_int __ashlti3(ti_int a, si_int b) {
+COMPILER_RT_ABI si_int __ashlsi3(si_int a, int b) {
   return __ashlXi3(a, b);
 }
-
-#endif // CRT_HAS_128BIT
