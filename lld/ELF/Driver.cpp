@@ -854,8 +854,8 @@ static bool getIsRela(opt::InputArgList &args) {
 
   // Otherwise use the psABI defined relocation entry format.
   uint16_t m = config->emachine;
-  return m == EM_AARCH64 || m == EM_AMDGPU || m == EM_HEXAGON || m == EM_PPC ||
-         m == EM_PPC64 || m == EM_RISCV || m == EM_X86_64;
+  return m == EM_AARCH64 || m == EM_AMDGPU || m == EM_AVR || m == EM_HEXAGON ||
+         m == EM_PPC || m == EM_PPC64 || m == EM_RISCV || m == EM_X86_64;
 }
 
 static void parseClangOption(StringRef opt, const Twine &msg) {

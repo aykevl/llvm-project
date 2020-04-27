@@ -54,18 +54,83 @@ AVR::AVR() { noneRel = R_AVR_NONE; }
 
 RelExpr AVR::getRelExpr(RelType type, const Symbol &s,
                         const uint8_t *loc) const {
-  return R_ABS;
+  switch (type) {
+  case R_AVR_7_PCREL:
+  case R_AVR_13_PCREL:
+    return R_PC;
+  default:
+    return R_ABS;
+  }
 }
 
 void AVR::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   switch (rel.type) {
   case R_AVR_CALL: {
+    // Fixup for call instructions.
+    // Format: 1001 010k kkkk 111k kkkk kkkk kkkk kkkk
+    checkInt(loc, val, 23, rel);
+    checkAlignment(loc, val, 2, rel);
     uint16_t hi = val >> 17;
     uint16_t lo = val >> 1;
     write16le(loc, read16le(loc) | ((hi >> 1) << 4) | (hi & 1));
     write16le(loc + 2, lo);
     break;
   }
+  case R_AVR_LO8_LDI:
+  case R_AVR_HI8_LDI:
+  case R_AVR_LO8_LDI_NEG:
+  case R_AVR_HI8_LDI_NEG:
+  case R_AVR_LO8_LDI_PM:
+  case R_AVR_HI8_LDI_PM: {
+    // Fixups for instructions such as ldi and subi. Usually two instructions
+    // are used together, one that uses the lower half and one that uses the
+    // upper half of a 16-bit value.
+    // Format: 1110 KKKK dddd KKKK
+    if (rel.type == R_AVR_LO8_LDI_NEG || rel.type == R_AVR_HI8_LDI_NEG) {
+      // Relocations for subi/sbci.
+      val &= 0xffff;       // clear the upper bit if this is a relocation to data space
+      val = 0x10000 - val; // make negative
+    }
+    if (rel.type == R_AVR_LO8_LDI_PM || rel.type == R_AVR_HI8_LDI_PM)
+      // Fixup for loading a function pointer, for example.
+      val = val >> 1;
+    if (rel.type == R_AVR_HI8_LDI || rel.type == R_AVR_HI8_LDI_PM || rel.type == R_AVR_HI8_LDI_NEG)
+      // Load the upper byte (R_AVR_HI8_LDI* relocations).
+      val >>= 8;
+    uint16_t hi4 = (val >> 4) & 0xf;
+    uint16_t lo4 = val & 0xf;
+    write16le(loc, read16le(loc) | (hi4 << 8) | lo4 );
+    break;
+  }
+  case R_AVR_7_PCREL:
+    // Fixup for relative branches such as brne. The branch target (in words)
+    // is k+1, so we have to subtract two from the branch target to correct for
+    // that.
+    // Format: 1111 01kk kkkk k001
+    val = (int64_t)val - 2;
+    checkInt(loc, val, 7, rel);
+    checkAlignment(loc, val, 2, rel);
+    write16le(loc, read16le(loc) | ((val >> 1) & 0x7f) << 3);
+    break;
+  case R_AVR_13_PCREL:
+    // Fixup for relative jumps: rjmp and rcall. Like R_AVR_7_PCREL, the branch
+    // target should be adjusted.
+    // Format: 1100 kkkk kkkk kkkk
+    val = (int64_t)val - 2;
+    checkInt(loc, val, 13, rel);
+    checkAlignment(loc, val, 2, rel);
+    write16le(loc, read16le(loc) | ((val >> 1) & 0xfff));
+    break;
+  case R_AVR_16:
+    // Note: this relocation is often used between code and data space, which
+    // are 0x800000 apart in the output ELF file. The bitmask cuts off the high
+    // bit.
+    write16le(loc, val & 0xffff);
+    break;
+  case R_AVR_32:
+    checkIntUInt(loc, val, 32, rel);
+    write32le(loc, val);
+    break;
   default:
     error(getErrorLocation(loc) + "unrecognized relocation " +
           toString(rel.type));
