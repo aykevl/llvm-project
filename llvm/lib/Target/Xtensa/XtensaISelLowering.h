@@ -105,7 +105,15 @@ public:
     return VT.changeVectorElementTypeToInteger();
   }
 
-  bool isFMAFasterThanFMulAndFAdd(EVT) const override { return true; }
+  bool isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
+                                  EVT) const override {
+    return true;
+  }
+
+  /// IR version
+  virtual bool isFMAFasterThanFMulAndFAdd(const Function &F, Type *) const {
+    return true;
+  }
 
   /// If a physical register, this returns the register that receives the
   /// exception address on entry to an EH pad.

@@ -32,7 +32,8 @@
 using namespace llvm;
 
 static MCAsmInfo *createXtensaMCAsmInfo(const MCRegisterInfo &MRI,
-                                        const Triple &TT) {
+                                        const Triple &TT,
+                                        const MCTargetOptions &Options) {
   MCAsmInfo *MAI = new XtensaMCAsmInfo(TT);
   MCCFIInstruction Inst = MCCFIInstruction::createDefCfa(
       nullptr, MRI.getDwarfRegNum(Xtensa::SP, true), 0);

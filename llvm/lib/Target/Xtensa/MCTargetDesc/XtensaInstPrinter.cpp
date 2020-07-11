@@ -73,9 +73,9 @@ void XtensaInstPrinter::printOperand(const MCOperand &MC, raw_ostream &O) {
     llvm_unreachable("Invalid operand");
 }
 
-void XtensaInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
-                                  StringRef Annot, const MCSubtargetInfo &STI) {
-  printInstruction(MI, O);
+void XtensaInstPrinter::printInst(const MCInst *MI, uint64_t Address, StringRef Annot,
+                                  const MCSubtargetInfo &STI, raw_ostream &O) {
+  printInstruction(MI, Address, O);
   printAnnotation(O, Annot);
 }
 

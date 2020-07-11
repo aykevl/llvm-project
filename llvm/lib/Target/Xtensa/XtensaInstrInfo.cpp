@@ -93,8 +93,8 @@ void XtensaInstrInfo::adjustStackPtr(unsigned SP, int64_t Amount,
 
 void XtensaInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator MBBI,
-                                  const DebugLoc &DL, unsigned DestReg,
-                                  unsigned SrcReg, bool KillSrc) const {
+                                  const DebugLoc &DL, MCRegister DestReg,
+                                  MCRegister SrcReg, bool KillSrc) const {
   unsigned Opcode;
 
   // when we are copying a phys reg we want the bits for fp
