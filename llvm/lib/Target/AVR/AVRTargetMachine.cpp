@@ -67,6 +67,7 @@ public:
 
   void addIRPasses() override;
   bool addInstSelector() override;
+  void addMachinePasses() override;
   void addPreSched2() override;
   void addPreEmitPass() override;
   void addPreRegAlloc() override;
@@ -91,6 +92,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAVRTarget() {
   RegisterTargetMachine<AVRTargetMachine> X(getTheAVRTarget());
 
   auto &PR = *PassRegistry::getPassRegistry();
+  initializeAVREarlyExpandPseudoPass(PR);
   initializeAVRExpandPseudoPass(PR);
   initializeAVRRelaxMemPass(PR);
   initializeAVRCombineMovPass(PR);
@@ -117,6 +119,14 @@ bool AVRPassConfig::addInstSelector() {
   addPass(createAVRFrameAnalyzerPass());
 
   return false;
+}
+
+void AVRPassConfig::addMachinePasses() {
+  addPass(createAVREarlyExpandPseudoPass());
+  addPass(createMachineVerifierPass("after early expand"));
+  addPass(&DeadMachineInstructionElimID);
+  addPass(createMachineVerifierPass("after early expand + DCE"));
+  TargetPassConfig::addMachinePasses();
 }
 
 void AVRPassConfig::addPreRegAlloc() {

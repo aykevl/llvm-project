@@ -52,16 +52,16 @@ declare void @foo2(i16*, i64, i64, i64)
 define void @dynalloca2(i16 %x) {
 ; CHECK-LABEL: dynalloca2:
 ; Store values on the stack
-; CHECK: ldi r16, 0
-; CHECK: ldi r17, 0
-; CHECK: push r17
-; CHECK: push r16
-; CHECK: push r17
-; CHECK: push r16
-; CHECK: push r17
-; CHECK: push r16
-; CHECK: push r17
-; CHECK: push r16
+; CHECK: ldi r30, 0
+; CHECK: mov r31, r30
+; CHECK: push r31
+; CHECK: push r30
+; CHECK: push r31
+; CHECK: push r30
+; CHECK: push r31
+; CHECK: push r30
+; CHECK: push r31
+; CHECK: push r30
 ; CHECK: call
 ; Call frame restore
 ; CHECK-NEXT: in r30, 61

@@ -25,6 +25,7 @@ class FunctionPass;
 Pass *createAVRShiftExpandPass();
 FunctionPass *createAVRISelDag(AVRTargetMachine &TM,
                                CodeGenOpt::Level OptLevel);
+FunctionPass *createAVREarlyExpandPseudoPass();
 FunctionPass *createAVRExpandPseudoPass();
 FunctionPass *createAVRFrameAnalyzerPass();
 FunctionPass *createAVRRelaxMemPass();
@@ -34,6 +35,7 @@ FunctionPass *createAVRBranchSelectionPass();
 FunctionPass *createAVRCallFrameOptimizationPass();
 
 void initializeAVRShiftExpandPass(PassRegistry &);
+void initializeAVREarlyExpandPseudoPass(PassRegistry&);
 void initializeAVRExpandPseudoPass(PassRegistry&);
 void initializeAVRRelaxMemPass(PassRegistry&);
 void initializeAVRCombineMovPass(PassRegistry&);

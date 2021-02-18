@@ -15,6 +15,7 @@ define i16 @com16(i16 %x) {
 ; CHECK:       ; %bb.0:
 ; CHECK-NEXT:    com r24
 ; CHECK-NEXT:    com r25
+; CHECK-NEXT:    ; kill: def $r25 killed $r25 def $r25r24 killed $r24
 ; CHECK-NEXT:    ret
   %neg = xor i16 %x, -1
   ret i16 %neg
@@ -27,6 +28,8 @@ define i32 @com32(i32 %x) {
 ; CHECK-NEXT:    com r23
 ; CHECK-NEXT:    com r24
 ; CHECK-NEXT:    com r25
+; CHECK-NEXT:    ; kill: def $r23 killed $r23 def $r23r22 killed $r22
+; CHECK-NEXT:    ; kill: def $r25 killed $r25 def $r25r24 killed $r24
 ; CHECK-NEXT:    ret
   %neg = xor i32 %x, -1
   ret i32 %neg
@@ -43,6 +46,10 @@ define i64 @com64(i64 %x) {
 ; CHECK-NEXT:    com r23
 ; CHECK-NEXT:    com r24
 ; CHECK-NEXT:    com r25
+; CHECK-NEXT:    ; kill: def $r19 killed $r19 def $r19r18 killed $r18
+; CHECK-NEXT:    ; kill: def $r21 killed $r21 def $r21r20 killed $r20
+; CHECK-NEXT:    ; kill: def $r23 killed $r23 def $r23r22 killed $r22
+; CHECK-NEXT:    ; kill: def $r25 killed $r25 def $r25r24 killed $r24
 ; CHECK-NEXT:    ret
   %neg = xor i64 %x, -1
   ret i64 %neg

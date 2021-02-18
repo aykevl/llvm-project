@@ -18,6 +18,7 @@ add_llvm_target(AVRCodeGen
   AVRAsmPrinter.cpp
   AVRCallFrameOptimization.cpp
   AVRCombineMov.cpp
+  AVREarlyExpandPseudoInsts.cpp
   AVRExpandPseudoInsts.cpp
   AVRFrameLowering.cpp
   AVRInstrInfo.cpp

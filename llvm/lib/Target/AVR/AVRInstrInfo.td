@@ -1960,7 +1960,7 @@ def ZEXT : ExtensionPseudo<
   (outs DREGS:$dst),
   (ins GPR8:$src),
   "zext\t$dst, $src",
-  [(set i16:$dst, (zext i8:$src)), (implicit SREG)]
+  [(set i16:$dst, (zext i8:$src))]
 >;
 
 // This pseudo gets expanded into a movw+adiw thus it clobbers SREG.

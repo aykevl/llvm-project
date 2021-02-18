@@ -51,6 +51,10 @@ public:
   AVRSubtarget &initializeSubtargetDependencies(StringRef CPU, StringRef FS,
                                                 const TargetMachine &TM);
 
+  //bool enableSubRegLiveness() const override {
+  //  return true;
+  //}
+
   // Subtarget feature getters.
   // See AVR.td for details.
   bool hasSRAM() const { return m_hasSRAM; }

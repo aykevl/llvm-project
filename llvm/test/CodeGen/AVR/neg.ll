@@ -16,6 +16,7 @@ define i16 @neg16(i16 %x) {
 ; CHECK-NEXT:    neg r25
 ; CHECK-NEXT:    neg r24
 ; CHECK-NEXT:    sbc r25, r1
+; CHECK-NEXT:    ; kill: def $r25 killed $r25 def $r25r24 killed $r24
 ; CHECK-NEXT:    ret
   %sub = sub i16 0, %x
   ret i16 %sub
