@@ -1256,14 +1256,14 @@ bool AVRExpandPseudo::expand<AVR::PUSHWRr>(Block &MBB, BlockIt MBBI) {
   unsigned OpHi = AVR::PUSHRr;
   TRI->splitReg(SrcReg, SrcLoReg, SrcHiReg);
 
-  // Low part
-  buildMI(MBB, MBBI, OpLo)
-    .addReg(SrcLoReg, getKillRegState(SrcIsKill))
-    .setMIFlags(Flags);
-
   // High part
   buildMI(MBB, MBBI, OpHi)
     .addReg(SrcHiReg, getKillRegState(SrcIsKill))
+    .setMIFlags(Flags);
+
+  // Low part
+  buildMI(MBB, MBBI, OpLo)
+    .addReg(SrcLoReg, getKillRegState(SrcIsKill))
     .setMIFlags(Flags);
 
   MI.eraseFromParent();
@@ -1280,8 +1280,8 @@ bool AVRExpandPseudo::expand<AVR::POPWRd>(Block &MBB, BlockIt MBBI) {
   unsigned OpHi = AVR::POPRd;
   TRI->splitReg(DstReg, DstLoReg, DstHiReg);
 
-  buildMI(MBB, MBBI, OpHi, DstHiReg).setMIFlags(Flags); // High
   buildMI(MBB, MBBI, OpLo, DstLoReg).setMIFlags(Flags); // Low
+  buildMI(MBB, MBBI, OpHi, DstHiReg).setMIFlags(Flags); // High
 
   MI.eraseFromParent();
   return true;
