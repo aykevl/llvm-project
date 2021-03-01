@@ -94,6 +94,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAVRTarget() {
   initializeAVRExpandPseudoPass(PR);
   initializeAVRRelaxMemPass(PR);
   initializeAVRShiftExpandPass(PR);
+  initializeAVRCallFrameOptimizationPass(PR);
 }
 
 const AVRSubtarget *AVRTargetMachine::getSubtargetImpl() const {
@@ -120,6 +121,9 @@ bool AVRPassConfig::addInstSelector() {
 void AVRPassConfig::addPreRegAlloc() {
   // Create the dynalloc SP save/restore pass to handle variable sized allocas.
   addPass(createAVRDynAllocaSRPass());
+  // Optimize call frame (replacing ADJCALLSTACKDOWN + stack stores with
+  // pushes). This pass is not optional.
+  addPass(createAVRCallFrameOptimizationPass());
 }
 
 void AVRPassConfig::addPreSched2() {

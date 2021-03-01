@@ -293,53 +293,12 @@ bool AVRFrameLowering::restoreCalleeSavedRegisters(
   return true;
 }
 
-/// Replace pseudo store instructions that pass arguments through the stack with
-/// real instructions.
-static void fixStackStores(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator MI,
-                           const TargetInstrInfo &TII, Register FP) {
-  // Iterate through the BB until we hit a call instruction or we reach the end.
-  for (auto I = MI, E = MBB.end(); I != E && !I->isCall();) {
-    MachineBasicBlock::iterator NextMI = std::next(I);
-    MachineInstr &MI = *I;
-    unsigned Opcode = I->getOpcode();
-
-    // Only care of pseudo store instructions where SP is the base pointer.
-    if (Opcode != AVR::STDSPQRr && Opcode != AVR::STDWSPQRr) {
-      I = NextMI;
-      continue;
-    }
-
-    assert(MI.getOperand(0).getReg() == AVR::SP &&
-           "Invalid register, should be SP!");
-
-    // Replace this instruction with a regular store. Use Y as the base
-    // pointer since it is guaranteed to contain a copy of SP.
-    unsigned STOpc =
-        (Opcode == AVR::STDWSPQRr) ? AVR::STDWPtrQRr : AVR::STDPtrQRr;
-
-    MI.setDesc(TII.get(STOpc));
-    MI.getOperand(0).setReg(FP);
-
-    I = NextMI;
-  }
-}
-
 MachineBasicBlock::iterator AVRFrameLowering::eliminateCallFramePseudoInstr(
     MachineFunction &MF, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator MI) const {
   const AVRSubtarget &STI = MF.getSubtarget<AVRSubtarget>();
   const AVRInstrInfo &TII = *STI.getInstrInfo();
 
-  // There is nothing to insert when the call frame memory is allocated during
-  // function entry. Delete the call frame pseudo and replace all pseudo stores
-  // with real store instructions.
-  if (hasReservedCallFrame(MF)) {
-    fixStackStores(MBB, MI, TII, AVR::R29R28);
-    return MBB.erase(MI);
-  }
-
-  DebugLoc DL = MI->getDebugLoc();
   unsigned int Opcode = MI->getOpcode();
   int Amount = TII.getFrameSize(*MI);
 
@@ -349,26 +308,9 @@ MachineBasicBlock::iterator AVRFrameLowering::eliminateCallFramePseudoInstr(
     assert(getStackAlign() == Align(1) && "Unsupported stack alignment");
 
     if (Opcode == TII.getCallFrameSetupOpcode()) {
-      // Update the stack pointer.
-      // In many cases this can be done far more efficiently by pushing the
-      // relevant values directly to the stack. However, doing that correctly
-      // (in the right order, possibly skipping some empty space for undef
-      // values, etc) is tricky and thus left to be optimized in the future.
-      BuildMI(MBB, MI, DL, TII.get(AVR::SPREAD), AVR::R31R30).addReg(AVR::SP);
-
-      MachineInstr *New = BuildMI(MBB, MI, DL, TII.get(AVR::SUBIWRdK), AVR::R31R30)
-                              .addReg(AVR::R31R30, RegState::Kill)
-                              .addImm(Amount);
-      New->getOperand(3).setIsDead();
-
-      BuildMI(MBB, MI, DL, TII.get(AVR::SPWRITE), AVR::SP)
-          .addReg(AVR::R31R30);
-
-      // Make sure the remaining stack stores are converted to real store
-      // instructions.
-      fixStackStores(MBB, MI, TII, AVR::R31R30);
+      llvm_unreachable("ADJCALLSTACKDOWN should have already been fully handled in avr-cf-opt!");
     } else {
-      assert(Opcode == TII.getCallFrameDestroyOpcode());
+      assert(Opcode == TII.getCallFrameDestroyOpcode() && "Call frame setup should have been lowered already!");
 
       // Note that small stack changes could be implemented more efficiently
       // with a few pop instructions instead of the 8-9 instructions now
@@ -384,6 +326,7 @@ MachineBasicBlock::iterator AVRFrameLowering::eliminateCallFramePseudoInstr(
       }
 
       // Build the instruction sequence.
+      DebugLoc DL = MI->getDebugLoc();
       BuildMI(MBB, MI, DL, TII.get(AVR::SPREAD), AVR::R31R30).addReg(AVR::SP);
 
       MachineInstr *New = BuildMI(MBB, MI, DL, TII.get(addOpcode), AVR::R31R30)

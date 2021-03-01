@@ -1313,15 +1313,16 @@ SDValue AVRTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
   }
 
-  // Second, stack arguments have to walked in reverse order by inserting
-  // chained stores, this ensures their order is not changed by the scheduler
-  // and that the push instruction sequence generated is correct, otherwise they
-  // can be freely intermixed.
+  // Second, stack arguments have to walked.
+  // Previously this code created chained stores but those chained stores appear
+  // to be unchained in the legalization phase. Therefore, do not attempt to
+  // chain them here but instead let the call frame optimization pass replace
+  // them with push instructions in the right order.
   if (HasStackArgs) {
-    for (AE = AI, AI = ArgLocs.size(); AI != AE; --AI) {
-      unsigned Loc = AI - 1;
-      CCValAssign &VA = ArgLocs[Loc];
-      SDValue Arg = OutVals[Loc];
+    SmallVector<SDValue, 8> MemOpChains;
+    for (; AI != AE; AI++) {
+      CCValAssign &VA = ArgLocs[AI];
+      SDValue Arg = OutVals[AI];
 
       assert(VA.isMemLoc());
 
@@ -1331,10 +1332,13 @@ SDValue AVRTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
           DAG.getRegister(AVR::SP, getPointerTy(DAG.getDataLayout())),
           DAG.getIntPtrConstant(VA.getLocMemOffset() + 1, DL));
 
-      Chain =
+      MemOpChains.push_back(
           DAG.getStore(Chain, DL, Arg, PtrOff,
-                       MachinePointerInfo::getStack(MF, VA.getLocMemOffset()));
+                       MachinePointerInfo::getStack(MF, VA.getLocMemOffset())));
     }
+
+    if (!MemOpChains.empty())
+      Chain = DAG.getNode(ISD::TokenFactor, DL, MVT::Other, MemOpChains);
   }
 
   // Build a sequence of copy-to-reg nodes chained together with token chain and
