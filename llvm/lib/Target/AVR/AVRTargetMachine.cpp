@@ -93,6 +93,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAVRTarget() {
   auto &PR = *PassRegistry::getPassRegistry();
   initializeAVRExpandPseudoPass(PR);
   initializeAVRRelaxMemPass(PR);
+  initializeAVRCombineMovPass(PR);
   initializeAVRShiftExpandPass(PR);
   initializeAVRCallFrameOptimizationPass(PR);
 }
@@ -129,6 +130,7 @@ void AVRPassConfig::addPreRegAlloc() {
 void AVRPassConfig::addPreSched2() {
   addPass(createAVRRelaxMemPass());
   addPass(createAVRExpandPseudoPass());
+  addPass(createAVRCombineMovPass());
 }
 
 void AVRPassConfig::addPreEmitPass() {

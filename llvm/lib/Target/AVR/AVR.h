@@ -28,6 +28,7 @@ FunctionPass *createAVRISelDag(AVRTargetMachine &TM,
 FunctionPass *createAVRExpandPseudoPass();
 FunctionPass *createAVRFrameAnalyzerPass();
 FunctionPass *createAVRRelaxMemPass();
+FunctionPass *createAVRCombineMovPass();
 FunctionPass *createAVRDynAllocaSRPass();
 FunctionPass *createAVRBranchSelectionPass();
 FunctionPass *createAVRCallFrameOptimizationPass();
@@ -35,6 +36,7 @@ FunctionPass *createAVRCallFrameOptimizationPass();
 void initializeAVRShiftExpandPass(PassRegistry &);
 void initializeAVRExpandPseudoPass(PassRegistry&);
 void initializeAVRRelaxMemPass(PassRegistry&);
+void initializeAVRCombineMovPass(PassRegistry&);
 void initializeAVRCallFrameOptimizationPass(PassRegistry&);
 
 /// Contains the AVR backend.
