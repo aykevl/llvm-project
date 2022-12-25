@@ -286,11 +286,6 @@ SDValue AVRTargetLowering::LowerShifts(SDValue Op, SelectionDAG &DAG) const {
          "Expected power-of-2 shift amount");
 
   if (VT.getSizeInBits() == 32) {
-    if (!isa<ConstantSDNode>(N->getOperand(1))) {
-      // 32-bit shifts are converted to a loop in IR.
-      // This should be unreachable.
-      report_fatal_error("Expected a constant shift amount!");
-    }
     SDVTList ResTys = DAG.getVTList(MVT::i16, MVT::i16);
     SDValue SrcLo =
         DAG.getNode(ISD::EXTRACT_ELEMENT, dl, MVT::i16, Op.getOperand(0),
@@ -298,25 +293,34 @@ SDValue AVRTargetLowering::LowerShifts(SDValue Op, SelectionDAG &DAG) const {
     SDValue SrcHi =
         DAG.getNode(ISD::EXTRACT_ELEMENT, dl, MVT::i16, Op.getOperand(0),
                     DAG.getConstant(1, dl, MVT::i16));
-    uint64_t ShiftAmount =
-        cast<ConstantSDNode>(N->getOperand(1))->getZExtValue();
-    if (ShiftAmount == 16) {
-      // Special case these two operations because they appear to be used by the
-      // generic codegen parts to lower 32-bit numbers.
-      // TODO: perhaps we can lower shift amounts bigger than 16 to a 16-bit
-      // shift of a part of the 32-bit value?
-      switch (Op.getOpcode()) {
-      case ISD::SHL: {
-        SDValue Zero = DAG.getConstant(0, dl, MVT::i16);
-        return DAG.getNode(ISD::BUILD_PAIR, dl, MVT::i32, Zero, SrcLo);
+    SDValue Cnt;
+    if (isa<ConstantSDNode>(N->getOperand(1))) {
+      // The amount to shift is known at compile time, so we can create an
+      // optimized sequence of instructions to shift this value.
+      uint64_t ShiftAmount =
+          cast<ConstantSDNode>(N->getOperand(1))->getZExtValue();
+      if (ShiftAmount == 16) {
+        // Special case these two operations because they appear to be used by
+        // the generic codegen parts to lower 32-bit numbers.
+        // TODO: perhaps we can lower shift amounts bigger than 16 to a 16-bit
+        // shift of a part of the 32-bit value?
+        switch (Op.getOpcode()) {
+        case ISD::SHL: {
+          SDValue Zero = DAG.getConstant(0, dl, MVT::i16);
+          return DAG.getNode(ISD::BUILD_PAIR, dl, MVT::i32, Zero, SrcLo);
+        }
+        case ISD::SRL: {
+          SDValue Zero = DAG.getConstant(0, dl, MVT::i16);
+          return DAG.getNode(ISD::BUILD_PAIR, dl, MVT::i32, SrcHi, Zero);
+        }
+        }
       }
-      case ISD::SRL: {
-        SDValue Zero = DAG.getConstant(0, dl, MVT::i16);
-        return DAG.getNode(ISD::BUILD_PAIR, dl, MVT::i32, SrcHi, Zero);
-      }
-      }
+      Cnt = DAG.getTargetConstant(ShiftAmount, dl, MVT::i8);
+    } else {
+      // The shift is not known at compile time, so we have to emit this as a
+      // loop.
+      Cnt = DAG.getNode(ISD::TRUNCATE, dl, MVT::i8, Op.getOperand(1));
     }
-    SDValue Cnt = DAG.getTargetConstant(ShiftAmount, dl, MVT::i8);
     unsigned Opc;
     switch (Op.getOpcode()) {
     default:
@@ -1857,20 +1861,20 @@ MachineBasicBlock *AVRTargetLowering::insertShift(MachineInstr &MI,
 // shifted.
 // For more information and background, see this blogpost:
 // https://aykevl.nl/2021/02/avr-bitshift
-static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
+static void insertMultibyteShift(MachineBasicBlock::iterator MBBI,
+                                 MachineBasicBlock *BB, const DebugLoc &dl,
                                  MutableArrayRef<std::pair<Register, int>> Regs,
                                  ISD::NodeType Opc, int64_t ShiftAmt) {
   const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
   const AVRSubtarget &STI = BB->getParent()->getSubtarget<AVRSubtarget>();
   MachineRegisterInfo &MRI = BB->getParent()->getRegInfo();
-  const DebugLoc &dl = MI.getDebugLoc();
 
   const bool ShiftLeft = Opc == ISD::SHL;
   const bool ArithmeticShift = Opc == ISD::SRA;
 
   // Zero a register, for use in later operations.
   Register ZeroReg = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-  BuildMI(*BB, MI, dl, TII.get(AVR::COPY), ZeroReg)
+  BuildMI(*BB, MBBI, dl, TII.get(AVR::COPY), ZeroReg)
       .addReg(STI.getZeroRegister());
 
   // Do a shift modulo 6 or 7. This is a bit more complicated than most shifts
@@ -1889,18 +1893,18 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
 
     // Shift one to the right, keeping the least significant bit as the carry
     // bit.
-    insertMultibyteShift(MI, BB, ShiftRegs, ISD::SRL, 1);
+    insertMultibyteShift(MBBI, BB, dl, ShiftRegs, ISD::SRL, 1);
 
     // Rotate the least significant bit from the carry bit into a new register
     // (that starts out zero).
     Register LowByte = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-    BuildMI(*BB, MI, dl, TII.get(AVR::RORRd), LowByte).addReg(ZeroReg);
+    BuildMI(*BB, MBBI, dl, TII.get(AVR::RORRd), LowByte).addReg(ZeroReg);
 
     // Shift one more to the right if this is a modulo-6 shift.
     if (ShiftAmt % 8 == 6) {
-      insertMultibyteShift(MI, BB, ShiftRegs, ISD::SRL, 1);
+      insertMultibyteShift(MBBI, BB, dl, ShiftRegs, ISD::SRL, 1);
       Register NewLowByte = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-      BuildMI(*BB, MI, dl, TII.get(AVR::RORRd), NewLowByte).addReg(LowByte);
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::RORRd), NewLowByte).addReg(LowByte);
       LowByte = NewLowByte;
     }
 
@@ -1928,7 +1932,7 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
         Regs.slice(0, ShiftRegsSize);
 
     // Shift one to the left.
-    insertMultibyteShift(MI, BB, ShiftRegs, ISD::SHL, 1);
+    insertMultibyteShift(MBBI, BB, dl, ShiftRegs, ISD::SHL, 1);
 
     // Sign or zero extend the most significant register into a new register.
     // The HighByte is the byte that still has one (or two) bits from the
@@ -1938,7 +1942,7 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
     Register ExtByte = 0;
     if (ArithmeticShift) {
       // Sign-extend bit that was shifted out last.
-      BuildMI(*BB, MI, dl, TII.get(AVR::SBCRdRr), HighByte)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::SBCRdRr), HighByte)
           .addReg(HighByte, RegState::Undef)
           .addReg(HighByte, RegState::Undef);
       ExtByte = HighByte;
@@ -1948,17 +1952,17 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
       // Use the zero register for zero extending.
       ExtByte = ZeroReg;
       // Rotate most significant bit into a new register (that starts out zero).
-      BuildMI(*BB, MI, dl, TII.get(AVR::ADCRdRr), HighByte)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::ADCRdRr), HighByte)
           .addReg(ExtByte)
           .addReg(ExtByte);
     }
 
     // Shift one more to the left for modulo 6 shifts.
     if (ShiftAmt % 8 == 6) {
-      insertMultibyteShift(MI, BB, ShiftRegs, ISD::SHL, 1);
+      insertMultibyteShift(MBBI, BB, dl, ShiftRegs, ISD::SHL, 1);
       // Shift the topmost bit into the HighByte.
       Register NewExt = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-      BuildMI(*BB, MI, dl, TII.get(AVR::ADCRdRr), NewExt)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::ADCRdRr), NewExt)
           .addReg(HighByte)
           .addReg(HighByte);
       HighByte = NewExt;
@@ -2003,10 +2007,10 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
       // Sign extend the most significant register into ShrExtendReg.
       ShrExtendReg = MRI.createVirtualRegister(&AVR::GPR8RegClass);
       Register Tmp = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-      BuildMI(*BB, MI, dl, TII.get(AVR::ADDRdRr), Tmp)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::ADDRdRr), Tmp)
           .addReg(Regs[0].first, 0, Regs[0].second)
           .addReg(Regs[0].first, 0, Regs[0].second);
-      BuildMI(*BB, MI, dl, TII.get(AVR::SBCRdRr), ShrExtendReg)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::SBCRdRr), ShrExtendReg)
           .addReg(Tmp)
           .addReg(Tmp);
     } else {
@@ -2052,22 +2056,22 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
     for (size_t I = 0; I < Regs.size(); I++) {
       size_t Idx = ShiftLeft ? I : Regs.size() - I - 1;
       Register SwapReg = MRI.createVirtualRegister(&AVR::LD8RegClass);
-      BuildMI(*BB, MI, dl, TII.get(AVR::SWAPRd), SwapReg)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::SWAPRd), SwapReg)
           .addReg(Regs[Idx].first, 0, Regs[Idx].second);
       if (I != 0) {
         Register R = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-        BuildMI(*BB, MI, dl, TII.get(AVR::EORRdRr), R)
+        BuildMI(*BB, MBBI, dl, TII.get(AVR::EORRdRr), R)
             .addReg(Prev)
             .addReg(SwapReg);
         Prev = R;
       }
       Register AndReg = MRI.createVirtualRegister(&AVR::LD8RegClass);
-      BuildMI(*BB, MI, dl, TII.get(AVR::ANDIRdK), AndReg)
+      BuildMI(*BB, MBBI, dl, TII.get(AVR::ANDIRdK), AndReg)
           .addReg(SwapReg)
           .addImm(ShiftLeft ? 0xf0 : 0x0f);
       if (I != 0) {
         Register R = MRI.createVirtualRegister(&AVR::GPR8RegClass);
-        BuildMI(*BB, MI, dl, TII.get(AVR::EORRdRr), R)
+        BuildMI(*BB, MBBI, dl, TII.get(AVR::EORRdRr), R)
             .addReg(Prev)
             .addReg(AndReg);
         size_t PrevIdx = ShiftLeft ? Idx - 1 : Idx + 1;
@@ -2088,11 +2092,11 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
       Register In = Regs[I].first;
       Register InSubreg = Regs[I].second;
       if (I == (ssize_t)Regs.size() - 1) { // first iteration
-        BuildMI(*BB, MI, dl, TII.get(AVR::ADDRdRr), Out)
+        BuildMI(*BB, MBBI, dl, TII.get(AVR::ADDRdRr), Out)
             .addReg(In, 0, InSubreg)
             .addReg(In, 0, InSubreg);
       } else {
-        BuildMI(*BB, MI, dl, TII.get(AVR::ADCRdRr), Out)
+        BuildMI(*BB, MBBI, dl, TII.get(AVR::ADCRdRr), Out)
             .addReg(In, 0, InSubreg)
             .addReg(In, 0, InSubreg);
       }
@@ -2108,9 +2112,10 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
       Register InSubreg = Regs[I].second;
       if (I == 0) {
         unsigned Opc = ArithmeticShift ? AVR::ASRRd : AVR::LSRRd;
-        BuildMI(*BB, MI, dl, TII.get(Opc), Out).addReg(In, 0, InSubreg);
+        BuildMI(*BB, MBBI, dl, TII.get(Opc), Out).addReg(In, 0, InSubreg);
       } else {
-        BuildMI(*BB, MI, dl, TII.get(AVR::RORRd), Out).addReg(In, 0, InSubreg);
+        BuildMI(*BB, MBBI, dl, TII.get(AVR::RORRd), Out)
+            .addReg(In, 0, InSubreg);
       }
       Regs[I] = std::pair(Out, 0);
     }
@@ -2122,16 +2127,99 @@ static void insertMultibyteShift(MachineInstr &MI, MachineBasicBlock *BB,
   }
 }
 
+// Do a multibyte shift by shifting one bit at a time in a loop. It works very
+// similar to insertMultibyteShift in that it modifies the Regs array in-place
+// (the output registers are stored in this array on return).
+static MachineBasicBlock *insertMultibyteShiftLoop(
+    MachineInstr &MI, MachineBasicBlock *BB, Register ShiftNum,
+    MutableArrayRef<std::pair<Register, int>> Regs, ISD::NodeType Opc) {
+  const DebugLoc &dl = MI.getDebugLoc();
+  MachineFunction *MF = BB->getParent();
+  const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
+  MachineRegisterInfo &MRI = BB->getParent()->getRegInfo();
+
+  // Create the necessary loop blocks in the right order.
+  MachineBasicBlock *EntryBB = BB;
+  MachineBasicBlock *LoopBB = MF->CreateMachineBasicBlock(BB->getBasicBlock());
+  MachineBasicBlock *CheckBB = MF->CreateMachineBasicBlock(BB->getBasicBlock());
+  MF->push_back(LoopBB);
+  MF->push_back(CheckBB);
+  MachineBasicBlock *ExitBB = EntryBB->splitAt(MI, false);
+  if (EntryBB == ExitBB) {
+    // This can sometimes happen when the shift instruction is at the end of a
+    // block, and flow control falls through to the next block.
+    // But we do still need a separate block, so insert an (unnecessary) jump
+    // instruction here.
+    assert(EntryBB->canFallThrough() && "Expected a fallthrough block!");
+    MachineBasicBlock *Fallthrough = EntryBB->getFallThrough();
+    BuildMI(EntryBB, dl, TII.get(AVR::RJMPk)).addMBB(Fallthrough);
+    ExitBB = EntryBB->splitAt(MI, false);
+  }
+  assert((ExitBB != EntryBB) && "Expected the block to be split!");
+  LoopBB->moveAfter(EntryBB);
+  CheckBB->moveAfter(LoopBB);
+  ExitBB->moveAfter(CheckBB);
+
+  // Connect the blocks.
+  EntryBB->addSuccessor(CheckBB);
+  LoopBB->addSuccessor(CheckBB);
+  CheckBB->addSuccessor(LoopBB);
+  CheckBB->addSuccessor(ExitBB);
+  EntryBB->removeSuccessor(ExitBB);
+
+  // Jump from the entry block into the loop header.
+  BuildMI(*EntryBB, MI, dl, TII.get(AVR::RJMPk)).addMBB(CheckBB);
+
+  // Create virtual registers for the value phi nodes.
+  SmallVector<Register, 4> PhiRegs;
+  SmallVector<std::pair<Register, int>, 4> PhiRegPairs;
+  for (size_t I = 0; I < Regs.size(); I++) {
+    Register Reg = MRI.createVirtualRegister(&AVR::GPR8RegClass);
+    PhiRegs.push_back(Reg);
+    PhiRegPairs.push_back(std::pair(Reg, 0));
+  }
+
+  // Shift the registers by one.
+  insertMultibyteShift(LoopBB->end(), LoopBB, dl, PhiRegPairs, Opc, 1);
+
+  // Create PHI nodes for the value that is shifted.
+  for (size_t I = 0; I < Regs.size(); I++) {
+    auto Pair = Regs[I];
+    BuildMI(CheckBB, dl, TII.get(AVR::PHI), PhiRegs[I])
+        .addReg(Pair.first, 0, Pair.second)
+        .addMBB(EntryBB)
+        .addReg(PhiRegPairs[I].first, 0, PhiRegPairs[I].second)
+        .addMBB(LoopBB);
+    Regs[I] = std::pair(PhiRegs[I], 0);
+  }
+
+  // Create a PHI node for the loop counter.
+  Register CntPhi = MRI.createVirtualRegister(&AVR::GPR8RegClass);
+  Register CntDec = MRI.createVirtualRegister(&AVR::GPR8RegClass);
+  BuildMI(CheckBB, dl, TII.get(AVR::PHI), CntPhi)
+      .addReg(ShiftNum)
+      .addMBB(EntryBB)
+      .addReg(CntDec)
+      .addMBB(LoopBB);
+
+  // Decrement the counter. Jump to the loop body if we're not finished. Else,
+  // fall through to the next basic block.
+  BuildMI(CheckBB, dl, TII.get(AVR::DECRd), CntDec).addReg(CntPhi);
+  BuildMI(CheckBB, dl, TII.get(AVR::BRPLk)).addMBB(LoopBB);
+
+  return ExitBB;
+}
+
 // Do a wide (32-bit) shift.
 MachineBasicBlock *
 AVRTargetLowering::insertWideShift(MachineInstr &MI,
                                    MachineBasicBlock *BB) const {
   const TargetInstrInfo &TII = *Subtarget.getInstrInfo();
   const DebugLoc &dl = MI.getDebugLoc();
+  MachineBasicBlock::iterator MBBI(&MI);
 
   // How much to shift to the right (meaning: a negative number indicates a left
   // shift).
-  int64_t ShiftAmt = MI.getOperand(4).getImm();
   ISD::NodeType Opc;
   switch (MI.getOpcode()) {
   case AVR::Lsl32:
@@ -2154,7 +2242,19 @@ AVRTargetLowering::insertWideShift(MachineInstr &MI,
   };
 
   // Do the shift. The registers are modified in-place.
-  insertMultibyteShift(MI, BB, Registers, Opc, ShiftAmt);
+  int64_t ShiftAmt = 1;
+  if (MI.getOperand(4).isImm()) {
+    // The shift amount is known at compile time.
+    ShiftAmt = MI.getOperand(4).getImm();
+    insertMultibyteShift(MBBI, BB, MI.getDebugLoc(), Registers, Opc, ShiftAmt);
+  } else {
+    // The shift amount is not known at compile time. We need to create a loop.
+    Register ShiftNum = MI.getOperand(4).getReg();
+    BB = insertMultibyteShiftLoop(MI, BB, ShiftNum, Registers, Opc);
+
+    // Insert REG_SEQUENCE instructions at the beginning of ExitBB.
+    MBBI = BB->begin();
+  }
 
   // Combine the 8-bit registers into 16-bit register pairs.
   // This done either from LSB to MSB or from MSB to LSB, depending on the
@@ -2170,24 +2270,28 @@ AVRTargetLowering::insertWideShift(MachineInstr &MI,
   if (Opc != ISD::SHL &&
       (Opc != ISD::SRA || (ShiftAmt < 16 || ShiftAmt >= 22))) {
     // Use the resulting registers starting with the least significant byte.
-    BuildMI(*BB, MI, dl, TII.get(AVR::REG_SEQUENCE), MI.getOperand(0).getReg())
+    BuildMI(*BB, MBBI, dl, TII.get(AVR::REG_SEQUENCE),
+            MI.getOperand(0).getReg())
         .addReg(Registers[3].first, 0, Registers[3].second)
         .addImm(AVR::sub_lo)
         .addReg(Registers[2].first, 0, Registers[2].second)
         .addImm(AVR::sub_hi);
-    BuildMI(*BB, MI, dl, TII.get(AVR::REG_SEQUENCE), MI.getOperand(1).getReg())
+    BuildMI(*BB, MBBI, dl, TII.get(AVR::REG_SEQUENCE),
+            MI.getOperand(1).getReg())
         .addReg(Registers[1].first, 0, Registers[1].second)
         .addImm(AVR::sub_lo)
         .addReg(Registers[0].first, 0, Registers[0].second)
         .addImm(AVR::sub_hi);
   } else {
     // Use the resulting registers starting with the most significant byte.
-    BuildMI(*BB, MI, dl, TII.get(AVR::REG_SEQUENCE), MI.getOperand(1).getReg())
+    BuildMI(*BB, MBBI, dl, TII.get(AVR::REG_SEQUENCE),
+            MI.getOperand(1).getReg())
         .addReg(Registers[0].first, 0, Registers[0].second)
         .addImm(AVR::sub_hi)
         .addReg(Registers[1].first, 0, Registers[1].second)
         .addImm(AVR::sub_lo);
-    BuildMI(*BB, MI, dl, TII.get(AVR::REG_SEQUENCE), MI.getOperand(0).getReg())
+    BuildMI(*BB, MBBI, dl, TII.get(AVR::REG_SEQUENCE),
+            MI.getOperand(0).getReg())
         .addReg(Registers[2].first, 0, Registers[2].second)
         .addImm(AVR::sub_hi)
         .addReg(Registers[3].first, 0, Registers[3].second)

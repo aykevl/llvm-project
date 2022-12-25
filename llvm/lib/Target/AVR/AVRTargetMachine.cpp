@@ -69,7 +69,6 @@ public:
     return getTM<AVRTargetMachine>();
   }
 
-  void addIRPasses() override;
   bool addInstSelector() override;
   void addPreSched2() override;
   void addPreEmitPass() override;
@@ -80,22 +79,12 @@ TargetPassConfig *AVRTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new AVRPassConfig(*this, PM);
 }
 
-void AVRPassConfig::addIRPasses() {
-  // Expand instructions like
-  //   %result = shl i32 %n, %amount
-  // to a loop so that library calls are avoided.
-  addPass(createAVRShiftExpandPass());
-
-  TargetPassConfig::addIRPasses();
-}
-
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAVRTarget() {
   // Register the target.
   RegisterTargetMachine<AVRTargetMachine> X(getTheAVRTarget());
 
   auto &PR = *PassRegistry::getPassRegistry();
   initializeAVRExpandPseudoPass(PR);
-  initializeAVRShiftExpandPass(PR);
   initializeAVRDAGToDAGISelPass(PR);
 }
 
